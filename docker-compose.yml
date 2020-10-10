@@ -1,0 +1,7 @@
+   bridge:
+    image: sercancicek1/numero-bridge:latest
+    restart: always
+    networks:
+      - numero
+    env_file:
+      - ./.bridge.env
