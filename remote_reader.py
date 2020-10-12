@@ -1,15 +1,12 @@
 import os
 from datetime import datetime
 from io import StringIO
-import random
-
 import pandas as pd
 import psycopg2
 import pyodbc
-import pytz
 
-CONNECTION_STRING = f'DRIVER={os.getenv("DRIVER")};SERVER={os.getenv("HOST_NAME")};DATABASE={os.getenv("DB_NAME")};UID={os.getenv("USER_NAME")};PWD={os.getenv("PASSWORD")}'
-TEMP_TABLE_NAME = 'temp_sap_saptecdoc'
+CONNECTION_STRING = f'DRIVER={{ODBC Driver 17 for SQL Server}};SERVER={os.getenv("HOST_NAME")};DATABASE={os.getenv("DB_NAME")};UID={os.getenv("USER_NAME")};PWD={os.getenv("PASSWORD")}'
+TEMP_TABLE_NAME = 'tempsapsaptecdoc'
 
 
 def read_data():
@@ -22,7 +19,7 @@ def read_data():
 
     # Close the Connection
     conn.close()
-    insert_df(df)
+    insert_df(df, TEMP_TABLE_NAME)
 
 
 def connect_to_target_db():
@@ -39,8 +36,13 @@ def connect_to_target_db():
     return conn
 
 
-def generate_schema_sql(target):
-    return f'DROP TABLE IF EXISTS {target}; CREATE TABLE {target} AS TABLE "SAPTECDOC" WITH NO DATA;'
+def get_drop_query(temp_table):
+    return f'DROP TABLE IF EXISTS "{temp_table}"';
+
+
+def get_insert_temp_qurey(temp_table):
+    print(f'CREATE TABLE "{temp_table}" AS TABLE "SAPTECDOC" WITH NO DATA')
+    return f'CREATE TABLE "{temp_table}" AS TABLE "SAPTECDOC" WITH NO DATA';
 
 
 def get_swap_tables_sql(tmp_table):
@@ -57,7 +59,6 @@ def get_buffer(df):
     # save data frame to an in memory buffer
     try:
         buffer = StringIO()
-        df["UPTIME"] = get_mexico_dt()
         df.to_csv(buffer, sep="|", index=False, header=False)
         buffer.seek(0)
         return buffer
@@ -77,7 +78,10 @@ def insert_df(df, tmp_table):
         print('an error occured at get buffer event')
         return
 
-    cursor = conn.cursor(tmp_table)
+    cursor = conn.cursor()
+    cursor.execute(get_drop_query(tmp_table))
+    conn.commit()
+    cursor = conn.cursor()
     res = insert_to_temp(buffer, conn, cursor, tmp_table)
     if res:
         if not swap_tables(conn, cursor, tmp_table):
@@ -97,28 +101,24 @@ def swap_tables(conn, cursor, tmp_table):
         return True
     except Exception as e:
         conn.rollback()
-        cursor.close()
+        # cursor.close()
         print(f'swap_tables ERROR: {e}')
         return False
 
 
 def insert_to_temp(buffer, conn, cursor, tmp_table):
     try:
-        cursor.execute(tmp_table)
+        cursor.execute(get_insert_temp_qurey(tmp_table))
         cursor.copy_from(buffer, tmp_table, sep="|")
         conn.commit()
         return True
     except Exception as e:
         conn.rollback()
-        cursor.close()
+        # cursor.close()
         print(f'insert_to_temp ERROR: {e}')
         return False
 
 
-def get_mexico_dt():
-    tz = pytz.timezone('America/Mexico_City')
-    mex_dt = datetime.now(tz=tz).ctime()
-    return mex_dt
 
 
 params_dic = {
