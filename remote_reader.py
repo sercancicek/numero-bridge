@@ -12,7 +12,7 @@ TEMP_TABLE_NAME = 'tempsapsaptecdoc'
 def read_data():
     # Create/Open a Connection to Microsoft's SQL Server
     conn = pyodbc.connect(CONNECTION_STRING)
-    sql = "SELECT TipoParte, ItemCode, ItemName, Marca, ItemPrice, ExistenciaMinerva, ExistenciaZapopan, ExistenciaCDMX, ExistenciaQRO, ExistenciaMTY FROM dbo.XXSINTECDOC"
+    sql = "SELECT TipoParte, ItemCode, ItemName, Marca, ItemPrice, ExistenciaMinerva, ExistenciaZapopan, ExistenciaCDMX, ExistenciaQRO, ExistenciaMTY, UPTIME FROM dbo.XXSINTECDOC"
     df = pd.read_sql(sql, conn)
     # Loop through the result set
     print(df)
